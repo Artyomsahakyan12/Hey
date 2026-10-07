@@ -45,7 +45,15 @@ const x=off;s('xref\n0 6\n0000000000 65535 f \n');for(let i=1;i<6;i++)s(String(o
 s('trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n'+x+'\n%%EOF');const out=new Uint8Array(off);let q=0;for(const b of parts){out.set(b,q);q+=b.length}return out}
 document.getElementById('b').onclick=async()=>{msg.textContent='';
 try{const bl=await new Promise(r=>cv.toBlob(r,'image/jpeg',.93)),jpg=new Uint8Array(await bl.arrayBuffer()),data=pdf(jpg,cv.width,cv.height);
-const dl=window.claude&&await claude.use('downloads');if(!dl){msg.textContent='Ներբեռնումը այստեղ հասանելի չէ։';return}
-await dl.save({filename:'Invoice_'+(v.date||'').replace(/\./g,'-')+'.pdf',data})}
+const filename='Invoice_'+(v.date||'').replace(/\./g,'-')+'.pdf';
+const blob=new Blob([data],{type:'application/pdf'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download=filename;
+document.body.appendChild(a);
+a.click();
+a.remove();
+URL.revokeObjectURL(url);
 catch(e){if(!e||e.code!=='declined')msg.textContent='Չհաջողվեց պահպանել'+(e&&e.code?' ('+e.code+')':'')+'։'}};
 </script></body></html>
