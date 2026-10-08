@@ -59,6 +59,8 @@
       text-align: center;
       font-size: 15px;
       min-height: 50px;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
     #pdfInfo {
       display: none;
@@ -77,6 +79,32 @@
       color: #777;
       font-size: 14px;
     }
+    /*
+      Hidden paste target.
+      We don't use a file input.
+      This element exists only so the browser
+      has a real paste target.
+    */
+    #pasteArea {
+      position: fixed;
+      left: 50%;
+      bottom: 20px;
+      width: calc(100% - 40px);
+      max-width: 460px;
+      transform: translateX(-50%);
+      padding: 16px;
+      background: white;
+      border: 2px dashed #2864e8;
+      border-radius: 16px;
+      text-align: center;
+      font-size: 15px;
+      color: #555;
+      display: none;
+      z-index: 9999;
+    }
+    #pasteArea.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -93,50 +121,115 @@
       <div id="pdfSize"></div>
     </div>
   </div>
+  <!--
+    Real browser paste target.
+    No file picker is used.
+  -->
+  <div id="pasteArea" tabindex="0">
+    Paste the copied PDF here
+  </div>
   <script>
     const pasteBtn = document.getElementById("pasteBtn");
     const status = document.getElementById("status");
     const pdfInfo = document.getElementById("pdfInfo");
     const pdfName = document.getElementById("pdfName");
     const pdfSize = document.getElementById("pdfSize");
+    const pasteArea = document.getElementById("pasteArea");
     let pastedPDF = null;
-pasteBtn.addEventListener("click", async () => {
-  try {
-    const items = await navigator.clipboard.read();
-
-    console.log("Clipboard items:", items);
-
-    for (const item of items) {
-      console.log("Available types:", item.types);
-
-      for (const type of item.types) {
-        try {
-          const blob = await item.getType(type);
-
-          console.log(
-            "TYPE:",
-            type,
-            "SIZE:",
-            blob.size
-          );
-        } catch (e) {
-          console.log("Cannot read:", type);
+    /*
+      STEP 1
+      User presses Paste PDF.
+      We do NOT use navigator.clipboard.read().
+      We activate a real paste target instead.
+    */
+    pasteBtn.addEventListener("click", () => {
+      pasteArea.classList.add("active");
+      pasteArea.focus();
+      status.textContent =
+        "Paste the copied PDF here.";
+    });
+    /*
+      STEP 2
+      Real browser paste event.
+      This checks clipboardData.files first.
+    */
+    pasteArea.addEventListener("paste", (event) => {
+      event.preventDefault();
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) {
+        status.textContent =
+          "Clipboard data is not available.";
+        return;
+      }
+      /*
+        Try actual files first.
+      */
+      const files = clipboardData.files;
+      if (files && files.length > 0) {
+        let pdfFile = null;
+        for (const file of files) {
+          if (
+            file.type === "application/pdf" ||
+            file.name.toLowerCase().endsWith(".pdf")
+          ) {
+            pdfFile = file;
+            break;
+          }
+        }
+        if (pdfFile) {
+          handlePDF(pdfFile);
+          return;
         }
       }
+      /*
+        If there is no File object,
+        inspect clipboard items.
+      */
+      const items = clipboardData.items;
+      if (items && items.length > 0) {
+        for (const item of items) {
+          /*
+            Direct PDF item.
+          */
+          if (item.type === "application/pdf") {
+            const file = item.getAsFile();
+            if (file) {
+              handlePDF(file);
+              return;
+            }
+          }
+        }
+      }
+      /*
+        Nothing usable was provided.
+      */
+      status.textContent =
+        "No PDF file was found in the clipboard.";
+    });
+    /*
+      Handle the PDF once WebKit gives us a File.
+    */
+    function handlePDF(file) {
+      pastedPDF = file;
+      pdfName.textContent =
+        file.name || "Copied PDF";
+      pdfSize.textContent =
+        formatBytes(file.size);
+      pdfInfo.style.display = "block";
+      status.textContent =
+        "PDF pasted successfully.";
+      /*
+        Hide paste target after success.
+      */
+      pasteArea.classList.remove("active");
     }
-
-    status.textContent =
-      "Clipboard checked. Open Safari Web Inspector to see available types.";
-
-  } catch (error) {
-    console.error(error);
-
-    status.textContent =
-      "Clipboard access failed: " + error.message;
-  }
-});
+    /*
+      File size formatter.
+    */
     function formatBytes(bytes) {
-      if (bytes === 0) return "0 Bytes";
+      if (bytes === 0) {
+        return "0 Bytes";
+      }
       const sizes = [
         "Bytes",
         "KB",
@@ -148,9 +241,14 @@ pasteBtn.addEventListener("click", async () => {
       );
       return (
         parseFloat(
-          (bytes / Math.pow(1024, i)).toFixed(2)
-        ) +
-        " " +
+          (
+            bytes /
+            Math.pow(1024, i)
+          ).toFixed(2)
+        )
+        +
+        " "
+        +
         sizes[i]
       );
     }
