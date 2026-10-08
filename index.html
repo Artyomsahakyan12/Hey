@@ -100,48 +100,41 @@
     const pdfName = document.getElementById("pdfName");
     const pdfSize = document.getElementById("pdfSize");
     let pastedPDF = null;
-    pasteBtn.addEventListener("click", async () => {
-      try {
-        if (!navigator.clipboard || !navigator.clipboard.read) {
-          status.textContent =
-            "Clipboard file access is not supported here.";
-          return;
-        }
-        status.textContent = "Reading clipboard...";
-        const items = await navigator.clipboard.read();
-        let foundPDF = false;
-        for (const item of items) {
-          const pdfType = item.types.find(type =>
-            type === "application/pdf"
+pasteBtn.addEventListener("click", async () => {
+  try {
+    const items = await navigator.clipboard.read();
+
+    console.log("Clipboard items:", items);
+
+    for (const item of items) {
+      console.log("Available types:", item.types);
+
+      for (const type of item.types) {
+        try {
+          const blob = await item.getType(type);
+
+          console.log(
+            "TYPE:",
+            type,
+            "SIZE:",
+            blob.size
           );
-          if (!pdfType) continue;
-          const blob = await item.getType(pdfType);
-          pastedPDF = new File(
-            [blob],
-            "pasted.pdf",
-            {
-              type: "application/pdf"
-            }
-          );
-          foundPDF = true;
-          pdfName.textContent = pastedPDF.name;
-          pdfSize.textContent =
-            formatBytes(pastedPDF.size);
-          pdfInfo.style.display = "block";
-          status.textContent =
-            "PDF pasted successfully.";
-          break;
+        } catch (e) {
+          console.log("Cannot read:", type);
         }
-        if (!foundPDF) {
-          status.textContent =
-            "No PDF file was found in the clipboard.";
-        }
-      } catch (error) {
-        console.error(error);
-        status.textContent =
-          "Could not read the PDF from the clipboard.";
       }
-    });
+    }
+
+    status.textContent =
+      "Clipboard checked. Open Safari Web Inspector to see available types.";
+
+  } catch (error) {
+    console.error(error);
+
+    status.textContent =
+      "Clipboard access failed: " + error.message;
+  }
+});
     function formatBytes(bytes) {
       if (bytes === 0) return "0 Bytes";
       const sizes = [
