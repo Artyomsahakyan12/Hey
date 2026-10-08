@@ -2,243 +2,483 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0,
                  maximum-scale=1.0, user-scalable=no">
-  <title>PDF Stamp</title>
+
+  <title>PDF Clipboard Test</title>
+
   <style>
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
     }
+
     body {
       margin: 0;
       min-height: 100vh;
       background: #f5f5f7;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-                   "Segoe UI", sans-serif;
+
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Display",
+        "Segoe UI",
+        sans-serif;
+
       display: flex;
       justify-content: center;
       align-items: flex-start;
     }
+
     .container {
       width: 100%;
       max-width: 500px;
       padding: 35px 20px;
     }
+
     h1 {
-      text-align: center;
       margin: 0 0 30px;
+
+      text-align: center;
+
       font-size: 28px;
       font-weight: 700;
+
       color: #111;
     }
-    button {
+
+    /*
+      This is a REAL editable paste target.
+      It is intentionally not display:none.
+    */
+
+    #pasteArea {
       width: 100%;
-      height: 60px;
-      margin-bottom: 15px;
-      border: 0;
+      min-height: 150px;
+
+      padding: 25px;
+
+      background: white;
+
+      border: 2px dashed #2864e8;
       border-radius: 18px;
-      background: #2864e8;
-      color: white;
-      font-size: 18px;
-      font-weight: 600;
-      cursor: pointer;
-      -webkit-appearance: none;
-      touch-action: manipulation;
+
+      outline: none;
+
+      color: #555;
+
+      font-size: 17px;
+      text-align: center;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      -webkit-user-select: text;
+      user-select: text;
+
+      overflow: hidden;
     }
-    button:active {
-      transform: scale(0.98);
+
+    #pasteArea:focus {
+      border-style: solid;
     }
+
     #status {
       margin-top: 15px;
-      padding: 15px;
-      border-radius: 14px;
+
+      padding: 16px;
+
       background: white;
+
+      border-radius: 14px;
+
       color: #333;
-      text-align: center;
+
       font-size: 15px;
-      min-height: 50px;
+
+      text-align: left;
+
       white-space: pre-wrap;
       word-break: break-word;
+
+      min-height: 80px;
     }
+
     #pdfInfo {
       display: none;
+
       margin-top: 15px;
+
       padding: 18px;
+
       background: white;
+
       border-radius: 16px;
+
       text-align: center;
     }
+
     #pdfName {
       font-weight: 600;
+
       word-break: break-word;
     }
+
     #pdfSize {
       margin-top: 6px;
+
       color: #777;
+
       font-size: 14px;
-    }
-    /*
-      Hidden paste target.
-      We don't use a file input.
-      This element exists only so the browser
-      has a real paste target.
-    */
-    #pasteArea {
-      position: fixed;
-      left: 50%;
-      bottom: 20px;
-      width: calc(100% - 40px);
-      max-width: 460px;
-      transform: translateX(-50%);
-      padding: 16px;
-      background: white;
-      border: 2px dashed #2864e8;
-      border-radius: 16px;
-      text-align: center;
-      font-size: 15px;
-      color: #555;
-      display: none;
-      z-index: 9999;
-    }
-    #pasteArea.active {
-      display: block;
     }
   </style>
 </head>
+
 <body>
+
   <div class="container">
-    <h1>PDF Stamp</h1>
-    <button id="pasteBtn">
-      Paste PDF
-    </button>
+
+    <h1>PDF Clipboard Test</h1>
+
+    <div
+      id="pasteArea"
+      contenteditable="true"
+      spellcheck="false"
+      tabindex="0"
+    >
+      Tap here and paste your copied PDF
+    </div>
+
     <div id="status">
-      Copy a PDF file, then press Paste PDF.
+      First copy a PDF from Files.
+      Then tap the box above and choose Paste.
     </div>
+
     <div id="pdfInfo">
+
       <div id="pdfName"></div>
+
       <div id="pdfSize"></div>
+
     </div>
+
   </div>
-  <!--
-    Real browser paste target.
-    No file picker is used.
-  -->
-  <div id="pasteArea" tabindex="0">
-    Paste the copied PDF here
-  </div>
+
+
   <script>
-    const pasteBtn = document.getElementById("pasteBtn");
-    const status = document.getElementById("status");
-    const pdfInfo = document.getElementById("pdfInfo");
-    const pdfName = document.getElementById("pdfName");
-    const pdfSize = document.getElementById("pdfSize");
-    const pasteArea = document.getElementById("pasteArea");
-    let pastedPDF = null;
+
+    const pasteArea =
+      document.getElementById("pasteArea");
+
+    const status =
+      document.getElementById("status");
+
+    const pdfInfo =
+      document.getElementById("pdfInfo");
+
+    const pdfName =
+      document.getElementById("pdfName");
+
+    const pdfSize =
+      document.getElementById("pdfSize");
+
+
     /*
-      STEP 1
-      User presses Paste PDF.
-      We do NOT use navigator.clipboard.read().
-      We activate a real paste target instead.
+      REAL PASTE EVENT
     */
-    pasteBtn.addEventListener("click", () => {
-      pasteArea.classList.add("active");
-      pasteArea.focus();
-      status.textContent =
-        "Paste the copied PDF here.";
-    });
-    /*
-      STEP 2
-      Real browser paste event.
-      This checks clipboardData.files first.
-    */
-    pasteArea.addEventListener("paste", (event) => {
+
+    pasteArea.addEventListener("paste", function(event) {
+
+      /*
+        Prevent Safari from inserting
+        random text/content into the editor.
+      */
+
       event.preventDefault();
-      const clipboardData = event.clipboardData;
-      if (!clipboardData) {
+
+
+      const data = event.clipboardData;
+
+
+      if (!data) {
+
         status.textContent =
-          "Clipboard data is not available.";
+          "ERROR:\n\n" +
+          "clipboardData is not available.";
+
         return;
       }
+
+
       /*
-        Try actual files first.
+        Show exactly what WebKit says
+        is available.
       */
-      const files = clipboardData.files;
-      if (files && files.length > 0) {
-        let pdfFile = null;
-        for (const file of files) {
+
+      let diagnostic = "";
+
+      diagnostic +=
+        "PASTE EVENT RECEIVED\n\n";
+
+
+      diagnostic +=
+        "Types:\n";
+
+
+      if (data.types) {
+
+        for (const type of data.types) {
+
+          diagnostic +=
+            "• " + type + "\n";
+        }
+
+      } else {
+
+        diagnostic +=
+          "No types reported.\n";
+      }
+
+
+      diagnostic +=
+        "\nFiles: " +
+        (data.files ? data.files.length : "N/A");
+
+
+      diagnostic +=
+        "\nItems: " +
+        (data.items ? data.items.length : "N/A");
+
+
+      status.textContent =
+        diagnostic;
+
+
+      /*
+        Check DataTransfer.files
+      */
+
+      if (data.files && data.files.length > 0) {
+
+        for (const file of data.files) {
+
+          diagnostic +=
+            "\n\nFILE FOUND\n";
+
+          diagnostic +=
+            "Name: " +
+            (file.name || "(no name)") +
+            "\n";
+
+          diagnostic +=
+            "Type: " +
+            (file.type || "(no type)") +
+            "\n";
+
+          diagnostic +=
+            "Size: " +
+            file.size +
+            " bytes";
+
+
+          /*
+            If this is the PDF,
+            keep it in memory.
+          */
+
           if (
             file.type === "application/pdf" ||
-            file.name.toLowerCase().endsWith(".pdf")
+            (
+              file.name &&
+              file.name
+                .toLowerCase()
+                .endsWith(".pdf")
+            )
           ) {
-            pdfFile = file;
-            break;
+
+            window.pastedPDF = file;
+
+
+            pdfName.textContent =
+              file.name || "Copied PDF";
+
+
+            pdfSize.textContent =
+              formatBytes(file.size);
+
+
+            pdfInfo.style.display =
+              "block";
+
+
+            diagnostic +=
+              "\n\nPDF SUCCESSFULLY RECEIVED";
+
+
+            status.textContent =
+              diagnostic;
+
+
+            return;
           }
         }
-        if (pdfFile) {
-          handlePDF(pdfFile);
-          return;
-        }
       }
+
+
       /*
-        If there is no File object,
-        inspect clipboard items.
+        If DataTransfer.files was empty,
+        inspect DataTransfer.items.
       */
-      const items = clipboardData.items;
-      if (items && items.length > 0) {
-        for (const item of items) {
+
+      if (data.items && data.items.length > 0) {
+
+        diagnostic +=
+          "\n\nITEM DETAILS:\n";
+
+
+        for (
+          let i = 0;
+          i < data.items.length;
+          i++
+        ) {
+
+          const item =
+            data.items[i];
+
+
+          diagnostic +=
+            "\nItem " +
+            i +
+            "\n";
+
+
+          diagnostic +=
+            "Kind: " +
+            item.kind +
+            "\n";
+
+
+          diagnostic +=
+            "Type: " +
+            item.type +
+            "\n";
+
+
           /*
-            Direct PDF item.
+            Try to get a File from
+            the clipboard item.
           */
-          if (item.type === "application/pdf") {
-            const file = item.getAsFile();
+
+          if (
+            item.kind === "file"
+          ) {
+
+            const file =
+              item.getAsFile();
+
+
             if (file) {
-              handlePDF(file);
-              return;
+
+              diagnostic +=
+                "File obtained!\n";
+
+
+              diagnostic +=
+                "Name: " +
+                (file.name || "(no name)") +
+                "\n";
+
+
+              diagnostic +=
+                "Type: " +
+                (file.type || "(no type)") +
+                "\n";
+
+
+              diagnostic +=
+                "Size: " +
+                file.size +
+                " bytes";
+
+
+              if (
+                file.type ===
+                "application/pdf" ||
+                (
+                  file.name &&
+                  file.name
+                    .toLowerCase()
+                    .endsWith(".pdf")
+                )
+              ) {
+
+                window.pastedPDF =
+                  file;
+
+
+                pdfName.textContent =
+                  file.name ||
+                  "Copied PDF";
+
+
+                pdfSize.textContent =
+                  formatBytes(
+                    file.size
+                  );
+
+
+                pdfInfo.style.display =
+                  "block";
+
+
+                diagnostic +=
+                  "\n\nPDF SUCCESSFULLY RECEIVED";
+
+
+                status.textContent =
+                  diagnostic;
+
+
+                return;
+              }
             }
           }
         }
       }
-      /*
-        Nothing usable was provided.
-      */
+
+
       status.textContent =
-        "No PDF file was found in the clipboard.";
+        diagnostic +
+        "\n\nNO PDF FILE WAS EXPOSED TO THE PAGE.";
+
     });
-    /*
-      Handle the PDF once WebKit gives us a File.
-    */
-    function handlePDF(file) {
-      pastedPDF = file;
-      pdfName.textContent =
-        file.name || "Copied PDF";
-      pdfSize.textContent =
-        formatBytes(file.size);
-      pdfInfo.style.display = "block";
-      status.textContent =
-        "PDF pasted successfully.";
-      /*
-        Hide paste target after success.
-      */
-      pasteArea.classList.remove("active");
-    }
-    /*
-      File size formatter.
-    */
+
+
     function formatBytes(bytes) {
+
       if (bytes === 0) {
         return "0 Bytes";
       }
+
+
       const sizes = [
         "Bytes",
         "KB",
         "MB",
         "GB"
       ];
-      const i = Math.floor(
-        Math.log(bytes) / Math.log(1024)
-      );
+
+
+      const i =
+        Math.floor(
+          Math.log(bytes) /
+          Math.log(1024)
+        );
+
+
       return (
         parseFloat(
           (
@@ -252,6 +492,8 @@
         sizes[i]
       );
     }
+
   </script>
+
 </body>
 </html>
